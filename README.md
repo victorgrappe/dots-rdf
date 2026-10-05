@@ -1,34 +1,53 @@
-# rdf
+# dots-rdf
+
+## Summary
 
 An RDF view of the dots graph, served over SPARQL by
 [Apache Jena Fuseki](https://jena.apache.org/documentation/fuseki2/) in Docker.
 
 ```
-rdf/
+dots-rdf/
 ├── README.md
+├── docker-compose.yml       # one service, port 3030 on localhost
 ├── jena/
 │   ├── Dockerfile           # Fuseki 6.2.0 on Java 21, from the Apache binary release
-│   ├── docker-compose.yml   # one service, port 3030 on localhost
-│   ├── config.ttl           # the "dots" dataset: in memory, loaded from turtle/
+│   ├── config.ttl           # the "dots" dataset: in memory, loaded from ttl/
 │   └── shiro.ini            # access control: open, for local use
 ├── map/
 │   └── index.html           # full-window map of a query's geometries
-├── sparql/                  # saved queries (.rq)
-└── turtle/
+├── sparql/                  # saved queries (.rq) and updates (.ru)
+└── ttl/
     └── dots.ttl             # the graph
 ```
 
 ## Run
 
-Run these from `rdf/jena/`. You need Docker Desktop running.
+Run these from the repository root. You need Docker Desktop running.
+
+### Docker
 
 ```bash
+# Clear the old image and container, then rebuild:
+docker compose down --rmi all
+docker rm -f dots-fuseki
+
+# Run in the foreground, with logs in the terminal:
+docker compose up --build
+
+
+# In detached mode
 docker compose up -d --build
 docker compose logs -f
 docker compose down
 ```
 
 The first build downloads Fuseki (about 50 MB). In the logs, wait for `Start Fuseki`.
+
+**The dataset is in memory.** It is reloaded from `ttl/dots.ttl` each time the
+container starts. Edit the file, then run `docker compose restart`. SPARQL updates
+work, but they are lost on restart. The Turtle file is the source of truth.
+
+### Endpoints
 
 | What | URL |
 | --- | --- |
@@ -38,13 +57,17 @@ The first build downloads Fuseki (about 50 MB). In the logs, wait for `Start Fus
 | Graph Store, read/write | <http://localhost:3030/dots/data> |
 | Graph Store, read only | <http://localhost:3030/dots/get> |
 
-**The dataset is in memory.** It is reloaded from `turtle/dots.ttl` each time the
-container starts. Edit the file, then run `docker compose restart`. SPARQL updates
-work, but they are lost on restart. The Turtle file is the source of truth.
+### Sparql
+
+```bash
+clear; curl -s http://localhost:3030/dots/sparql \
+  -H 'Accept: text/csv' \
+  --data-urlencode 'query=SELECT * WHERE { ?s ?p ?o } LIMIT 10'
+```
 
 ## Mapping from the vault
 
-`turtle/dots.ttl` is a hand-written slice of `dots/dot/`. It covers the food
+`ttl/dots.ttl` is a hand-written slice of `dots/dot/`. It covers the food
 chain, the matter chain, and one link dot.
 
 | Frontmatter | RDF |
@@ -94,36 +117,9 @@ curl -s http://localhost:3030/dots/sparql \
   --data-urlencode 'query=SELECT * WHERE { ?s ?p ?o } LIMIT 10'
 ```
 
-```bash
-curl -s http://localhost:3030/dots/sparql -H 'Accept: text/csv' --data-urlencode 'query@sparql/class-hierarchy.rq'
-
-curl \
-  -s http://localhost:3030/dots/sparql \
-  -H 'Accept: text/csv' \
-  --data-urlencode 'query@rdf/sparql/class-hierarchy.rq'
-
-
-
-export OUT_FORMAT="text/plain"
-export OUT_FORMAT="text/csv"
-export OUT_FORMAT="text/tab-separated-values"
-export OUT_FORMAT="application/sparql-results+json"
-export OUT_FORMAT="application/sparql-results+xml"
-
-
-clear; curl \
-  -s http://localhost:3030/dots/sparql \
-  -H "Accept: ${OUT_FORMAT}" \
-  --data-urlencode 'query@rdf/sparql/class-hierarchy.rq'
-
-
-curl \
-  -s http://localhost:3030/dots/sparql \
-  -H 'Accept: application/sparql-results+json' \
-  --data-urlencode 'query@rdf/sparql/class-hierarchy.rq'
-
-For JSON instead of CSV, change the header to Accept: application/sparql-results+json. You can also paste a file into the query editor at http://localhost:3030.
-```
+Results come back in the format named by the `Accept` header: `text/csv`,
+`text/tab-separated-values`, `text/plain` (a text table),
+`application/sparql-results+json` or `application/sparql-results+xml`.
 
 ## Saved queries
 
@@ -138,7 +134,7 @@ For JSON instead of CSV, change the header to Accept: application/sparql-results
 | `countries-geo.rq` | GeoSPARQL: each pair of countries, whether they touch, and their distance |
 | `countries-map.rq` | the country polygons, for the 🌍 **Geo** map tab of the web UI |
 
-Run one from `rdf/` while the server is up. `query@file` makes curl read the
+Run one from the repository root while the server is up. `query@file` makes curl read the
 query from the file:
 
 ```bash
@@ -160,9 +156,8 @@ To run all the queries:
 for q in sparql/*.rq; do echo "== $q"; curl -s http://localhost:3030/dots/sparql -H 'Accept: text/csv' --data-urlencode "query@$q"; done
 ```
 
-For other formats, change the `Accept` header to `text/tab-separated-values` or
-`application/sparql-results+json`. You can also paste a file into the query editor
-of the web UI.
+For other formats, change the `Accept` header (see [Query](#query)). You can also
+paste a file into the query editor of the web UI.
 
 ## Map
 
@@ -195,7 +190,7 @@ Then run `docker compose up -d --build`.
 
 ## Security
 
-`shiro.ini` opens everything, including the admin API under `/$/`. This is safe
+`jena/shiro.ini` opens everything, including the admin API under `/$/`. This is safe
 only because `docker-compose.yml` publishes the port on `127.0.0.1`. If you expose
-the port more widely, first restrict `/$/**` in `shiro.ini`. The commented default
+the port more widely, first restrict `/$/**` in `jena/shiro.ini`. The commented default
 in the Fuseki distribution shows how.

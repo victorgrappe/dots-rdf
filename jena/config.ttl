@@ -1,7 +1,7 @@
 # Fuseki server configuration.
 #
-# One dataset, "dots", held in memory and loaded from rdf/turtle/dots.ttl
-# (mounted at /data/turtle) every time the server starts. The Turtle file is
+# One dataset, "dots", held in memory and loaded from ttl/dots.ttl
+# (mounted at /data/ttl) every time the server starts. The Turtle file is
 # the source of truth: SPARQL updates work, but are lost on restart.
 
 PREFIX fuseki: <http://jena.apache.org/fuseki#>
@@ -21,4 +21,4 @@ PREFIX rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
     fuseki:dataset <#dataset> .
 
 <#dataset> rdf:type ja:MemoryDataset ;
-    ja:data "/data/turtle/dots.ttl" .
+    ja:data "/data/ttl/dots.ttl" .

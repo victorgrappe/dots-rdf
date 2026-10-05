@@ -1,13 +1,13 @@
 services:
   fuseki:
-    build: .
+    build: ./jena
     image: dots-fuseki
     container_name: dots-fuseki
     ports:
-      # Bound to localhost only: shiro.ini leaves the admin API open.
+      # Bound to localhost only: jena/shiro.ini leaves the admin API open.
       - "127.0.0.1:3030:3030"
     volumes:
-      - ./config.ttl:/fuseki/config.ttl:ro
-      - ./shiro.ini:/fuseki/run/shiro.ini:ro
-      - ../turtle:/data/turtle:ro
+      - ./jena/config.ttl:/fuseki/config.ttl:ro
+      - ./jena/shiro.ini:/fuseki/run/shiro.ini:ro
+      - ./ttl:/data/ttl:ro
     restart: unless-stopped
