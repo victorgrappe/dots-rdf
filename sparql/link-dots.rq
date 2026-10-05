@@ -1,0 +1,19 @@
+# Link dots: what goes into what, in order, with its multiplier.
+# Mirrors the `in` / `out` frontmatter of files like
+# dots/dot/Vegetable Soup--Recipe--in--Carrot.md.
+
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX dots: <http://dots.local/schema#>
+
+SELECT ?inLabel ?relation ?outLabel ?order ?multiplier
+WHERE {
+  ?link a ?relation ;
+        dots:in  ?in ;
+        dots:out ?out .
+  ?in  rdfs:label ?inLabel .
+  ?out rdfs:label ?outLabel .
+  FILTER (lang(?inLabel) = "" && lang(?outLabel) = "")
+  OPTIONAL { ?link dots:order ?order }
+  OPTIONAL { ?link dots:multiplier ?multiplier }
+}
+ORDER BY ?inLabel ?order

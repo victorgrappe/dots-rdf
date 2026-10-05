@@ -1,0 +1,25 @@
+# The country polygons, for the map view of the Fuseki web UI.
+# Run insert-countries.ru first.
+#
+# In http://localhost:3030 > dots > query, run this query, then open the
+# 🌍 "Geo" tab above the results. That tab draws every column holding a
+# geo:wktLiteral. A column named exactly `wktColor` sets each shape's colour,
+# and clicking a shape shows the row's other columns.
+
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX geo:  <http://www.opengis.net/ont/geosparql#>
+PREFIX dot:  <http://dots.local/dot/>
+
+SELECT ?country ?wkt ?wktColor
+WHERE {
+  ?c a dot:Country ;
+     rdfs:label ?country ;
+     geo:hasGeometry/geo:asWKT ?wkt .
+
+  VALUES (?country ?wktColor) {
+    ("France"  "#1f77b4")
+    ("Spain"   "#d62728")
+    ("Germany" "#2ca02c")
+  }
+}
+ORDER BY ?country

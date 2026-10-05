@@ -1,0 +1,16 @@
+# Every instance (`type:`), its direct type, and the top-level class
+# (the direct child of Dot) it falls under.
+
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX dot:  <http://dots.local/dot/>
+PREFIX dots: <http://dots.local/schema#>
+
+SELECT ?instance ?type ?top ?wikidata
+WHERE {
+  ?instance a ?type .
+  ?type rdfs:subClassOf* ?top .
+  ?top  rdfs:subClassOf dot:Dot .
+  FILTER (STRSTARTS(STR(?type), STR(dot:)))
+  OPTIONAL { ?instance dots:wikidata ?wikidata }
+}
+ORDER BY ?type ?instance

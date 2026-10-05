@@ -1,0 +1,159 @@
+# A small slice of the dots graph, written by hand in Turtle.
+#
+# Mapping from the vault's frontmatter:
+#   class:        -> rdfs:subClassOf   ("a is a b", transitive)
+#   type:         -> rdf:type          ("instance of", not transitive)
+#   wikidata__cd: -> dots:wikidata     (link to the Wikidata entity)
+#   description:  -> rdfs:comment
+#   name__fr:     -> rdfs:label "..."@fr
+#   proton__nb:   -> dots:protonCount
+#
+# Link dots (class "[[in]]" / "[[out]]" with `in` and `out` keys) become
+# nodes of their own, typed dots:In / dots:Out, so they can carry
+# `order` and `multiplier`.
+
+@prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:   <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:   <http://www.w3.org/2001/XMLSchema#> .
+@prefix wd:    <http://www.wikidata.org/entity/> .
+@prefix dots:  <http://dots.local/schema#> .
+@prefix dot:   <http://dots.local/dot/> .
+
+# --- Schema ------------------------------------------------------------------
+
+dots:wikidata a owl:ObjectProperty ;
+    rdfs:label "wikidata__cd" ;
+    rdfs:comment "The Wikidata entity this dot corresponds to." .
+
+dots:in a owl:ObjectProperty ;
+    rdfs:label "in" ;
+    rdfs:comment "The dot on the input side of a link dot." .
+
+dots:out a owl:ObjectProperty ;
+    rdfs:label "out" ;
+    rdfs:comment "The dot on the output side of a link dot." .
+
+dots:order a owl:DatatypeProperty ;
+    rdfs:label "order" .
+
+dots:multiplier a owl:DatatypeProperty ;
+    rdfs:label "multiplier" .
+
+dots:protonCount a owl:DatatypeProperty ;
+    rdfs:label "proton__nb" .
+
+dots:In  a owl:Class ; rdfs:subClassOf dot:Relation ; rdfs:label "in" .
+dots:Out a owl:Class ; rdfs:subClassOf dot:Relation ; rdfs:label "out" .
+
+# --- Root --------------------------------------------------------------------
+
+dot:Dot a owl:Class ;
+    rdfs:label "Dot" ;
+    rdfs:comment "The root object. Has no class, so every chain terminates here." .
+
+dot:Relation a owl:Class ;
+    rdfs:subClassOf dot:Dot ;
+    rdfs:label "Relation" .
+
+# --- Classes (class: -> rdfs:subClassOf) ------------------------------------
+
+dot:Aliment a owl:Class ;
+    rdfs:subClassOf dot:Dot ;
+    rdfs:label "Aliment" , "Aliment"@fr ;
+    dots:wikidata wd:Q118451828 .
+
+dot:Food a owl:Class ;
+    rdfs:subClassOf dot:Aliment ;
+    rdfs:label "Food" , "Nourriture"@fr ;
+    rdfs:comment "Any substance consumed to provide nutritional support for the body." ;
+    dots:wikidata wd:Q2095 .
+
+dot:Dish a owl:Class ;
+    rdfs:subClassOf dot:Aliment ;
+    rdfs:label "Dish" , "Mets"@fr ;
+    rdfs:comment "Specific food preparation with cooking finished, and ready to eat, or be served." ;
+    dots:wikidata wd:Q746549 .
+
+dot:Recipe a owl:Class ;
+    rdfs:subClassOf dot:Aliment ;
+    rdfs:label "Recipe" , "Recette"@fr ;
+    rdfs:comment "A set of instructions for preparing a processed food item." ;
+    dots:wikidata wd:Q219239 .
+
+dot:Vegetable a owl:Class ;
+    rdfs:subClassOf dot:Food ;
+    rdfs:label "Vegetable" , "Légume"@fr ;
+    rdfs:comment "Edible plant or part of a plant." ;
+    dots:wikidata wd:Q11004 .
+
+dot:Root_Vegetable a owl:Class ;
+    rdfs:subClassOf dot:Vegetable ;
+    rdfs:label "Root Vegetable" , "Légume-racine"@fr ;
+    rdfs:comment "Plant root used as a vegetable." ;
+    dots:wikidata wd:Q20136 .
+
+dot:Carrot a owl:Class ;
+    rdfs:subClassOf dot:Root_Vegetable ;
+    rdfs:label "Carrot" , "Carotte"@fr ;
+    rdfs:comment "Taproot of the domesticated carrot plant." ;
+    dots:wikidata wd:Q81 .
+
+dot:Soup a owl:Class ;
+    rdfs:subClassOf dot:Dish ;
+    rdfs:label "Soup" , "Soupe"@fr ;
+    rdfs:comment "Primarily liquid food." ;
+    dots:wikidata wd:Q41415 .
+
+dot:Vegetable_Soup a owl:Class ;
+    rdfs:subClassOf dot:Soup ;
+    rdfs:label "Vegetable Soup" , "Soupe de Légumes"@fr ;
+    rdfs:comment "Soup with vegetables." ;
+    dots:wikidata wd:Q1501244 .
+
+dot:Beef_bourguignon a owl:Class ;
+    rdfs:subClassOf dot:Dish ;
+    rdfs:label "Beef bourguignon" ;
+    rdfs:comment "French wine-based beef stew." ;
+    dots:wikidata wd:Q1022124 .
+
+dot:Vegetable_Soup--Recipe a owl:Class ;
+    rdfs:subClassOf dot:Recipe ;
+    rdfs:label "Vegetable Soup--Recipe" .
+
+dot:Matter a owl:Class ;
+    rdfs:subClassOf dot:Dot ;
+    rdfs:label "Matter" ;
+    rdfs:comment "Substance that has rest mass and volume." ;
+    dots:wikidata wd:Q35758 .
+
+dot:Baryonic_Matter a owl:Class ;
+    rdfs:subClassOf dot:Matter ;
+    rdfs:label "Baryonic Matter" ;
+    dots:wikidata wd:Q6005984 .
+
+dot:Chemical_Element a owl:Class ;
+    rdfs:subClassOf dot:Baryonic_Matter ;
+    rdfs:label "Chemical Element" ;
+    dots:wikidata wd:Q11344 .
+
+# --- Instances (type: -> rdf:type) -------------------------------------------
+
+dot:Hydrogen a dot:Chemical_Element ;
+    rdfs:label "Hydrogen" ;
+    dots:wikidata wd:Q556 ;
+    dots:protonCount 1 .
+
+dot:Carbon a dot:Chemical_Element ;
+    rdfs:label "Carbon" ;
+    dots:wikidata wd:Q623 ;
+    dots:protonCount 6 .
+
+# --- Link dots ---------------------------------------------------------------
+
+dot:Vegetable_Soup--Recipe--in--Carrot a dots:In ;
+    rdfs:label "Vegetable Soup--Recipe--in--Carrot" ;
+    dots:in  dot:Vegetable_Soup--Recipe ;
+    dots:out dot:Carrot ;
+    dots:order 5 ;
+    dots:multiplier 0.55 .

@@ -1,0 +1,17 @@
+# Every class under Dot, with its direct parent (`class:`) and its depth,
+# i.e. how many `class` links separate it from Dot.
+
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX dot:  <http://dots.local/dot/>
+
+SELECT ?class ?parent (COUNT(DISTINCT ?ancestor) AS ?depth)
+WHERE {
+  ?c rdfs:subClassOf ?p ;
+     rdfs:subClassOf+ ?ancestor ;
+     rdfs:label ?class .
+  ?p rdfs:label ?parent .
+  ?ancestor rdfs:subClassOf* dot:Dot .
+  FILTER (lang(?class) = "" && lang(?parent) = "")
+}
+GROUP BY ?class ?parent
+ORDER BY ?depth ?parent ?class

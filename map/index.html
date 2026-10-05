@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dots map</title>
+<!--
+  Full-window map of a SPARQL query's geometries, read from Fuseki.
+
+  Same conventions as the Geo tab of the Fuseki web UI:
+    - every column holding a geo:wktLiteral (or geo:geoJSONLiteral) is drawn;
+    - a column named `wktColor` sets the shape's colour;
+    - a column named `wktLabel` labels the shape (otherwise the first plain
+      text column does);
+    - clicking a shape shows the whole row.
+
+  Open the file directly (`open rdf/map/index.html`): Fuseki allows CORS.
+-->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root {
+    --panel-bg: rgba(255, 255, 255, 0.96);
+    --panel-fg: #1d1d1f;
+    --muted: #6b6b70;
+    --border: #d6d6db;
+    --input-bg: #ffffff;
+    --accent: #1f6feb;
+    --accent-fg: #ffffff;
+    --error: #c62828;
+    --body-bg: #e8e8ec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --panel-bg: rgba(28, 28, 30, 0.96);
+      --panel-fg: #f2f2f7;
+      --muted: #a1a1a8;
+      --border: #3a3a3f;
+      --input-bg: #111113;
+      --accent: #4c8dff;
+      --accent-fg: #ffffff;
+      --error: #ff6b6b;
+      --body-bg: #1c1c1e;
+    }
+  }
+  :root[data-theme="dark"] {
+    --panel-bg: rgba(28, 28, 30, 0.96);
+    --panel-fg: #f2f2f7;
+    --muted: #a1a1a8;
+    --border: #3a3a3f;
+    --input-bg: #111113;
+    --accent: #4c8dff;
+    --accent-fg: #ffffff;
+    --error: #ff6b6b;
+    --body-bg: #1c1c1e;
+  }
+
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--body-bg);
+    font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  #map { position: fixed; inset: 0; }
+
+  .panel {
+    position: fixed; top: 12px; left: 56px; z-index: 1000;
+    width: min(440px, calc(100vw - 72px));
+    background: var(--panel-bg); color: var(--panel-fg);
+    border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18);
+  }
+  .panel header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; cursor: pointer; user-select: none;
+  }
+  .panel header strong { flex: 1; }
+  .panel .body { padding: 0 10px 10px; display: grid; gap: 8px; }
+  .panel.collapsed .body { display: none; }
+  .panel label { font-size: 12px; color: var(--muted); display: grid; gap: 3px; }
+  .panel input, .panel textarea {
+    width: 100%; box-sizing: border-box;
+    background: var(--input-bg); color: var(--panel-fg);
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px;
+    font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .panel textarea { height: 230px; resize: vertical; }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .row .status { flex: 1; font-size: 12px; color: var(--muted); }
+  .row .status.error { color: var(--error); }
+  button {
+    border: 1px solid var(--border); border-radius: 6px; padding: 5px 12px;
+    background: var(--input-bg); color: var(--panel-fg); font: inherit; cursor: pointer;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+  .chevron { color: var(--muted); font-size: 12px; }
+
+  .dots-label {
+    background: transparent; border: 0; box-shadow: none;
+    font-weight: 600; color: #111; text-shadow: 0 0 3px #fff, 0 0 3px #fff;
+  }
+  .dots-label::before { display: none; }
+  .leaflet-popup-content { font-size: 12px; max-width: 320px; overflow-wrap: anywhere; }
+  .fs-button { font-size: 18px; line-height: 30px; text-align: center; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<section class="panel" id="panel">
+  <header id="toggle">
+    <strong>SPARQL</strong>
+    <span class="chevron" id="chevron">▲ hide</span>
+  </header>
+  <div class="body">
+    <label>Endpoint
+      <input id="endpoint" spellcheck="false">
+    </label>
+    <label>Query <span>(⌘/Ctrl + Enter to run)</span>
+      <textarea id="query" spellcheck="false"></textarea>
+    </label>
+    <div class="row">
+      <span class="status" id="status"></span>
+      <button id="reset" type="button">Reset</button>
+      <button id="run" type="button" class="primary">Run</button>
+    </div>
+  </div>
+</section>
+
+<script>
+// Same as rdf/sparql/countries-map.rq.
+const DEFAULT_QUERY = `PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX geo:  <http://www.opengis.net/ont/geosparql#>
+PREFIX dot:  <http://dots.local/dot/>
+
+SELECT ?country ?wkt ?wktColor
+WHERE {
+  ?c a dot:Country ;
+     rdfs:label ?country ;
+     geo:hasGeometry/geo:asWKT ?wkt .
+
+  VALUES (?country ?wktColor) {
+    ("France"  "#1f77b4")
+    ("Spain"   "#d62728")
+    ("Germany" "#2ca02c")
+  }
+}
+ORDER BY ?country`;
+const DEFAULT_ENDPOINT = 'http://localhost:3030/dots/sparql';
+const DEFAULT_COLOR = '#3388ff';
+const WKT = 'http://www.opengis.net/ont/geosparql#wktLiteral';
+const GEOJSON = 'http://www.opengis.net/ont/geosparql#geoJSONLiteral';
+
+// --- Per-viewer convenience: remember the last endpoint and query. ----------
+
+const store = {
+  get(key) { try { return localStorage.getItem(key); } catch { return null; } },
+  set(key, value) { try { localStorage.setItem(key, value); } catch {} },
+};
+
+// --- WKT -> GeoJSON geometry ------------------------------------------------
+// Handles POINT, LINESTRING, POLYGON and their MULTI forms, with or without a
+// leading CRS IRI. Coordinates stay "x y" = "longitude latitude" (CRS84).
+
+function parseWkt(text) {
+  const src = text.trim().replace(/^<[^>]*>\s*/, '');
+  const match = src.match(/^(MULTI)?(POINT|LINESTRING|POLYGON)\s*(Z|M|ZM)?\s*(\(.*\))\s*$/is);
+  if (!match) throw new Error('Unsupported WKT: ' + src.slice(0, 40));
+  const type = (match[1] ? 'Multi' : '') +
+    { POINT: 'Point', LINESTRING: 'LineString', POLYGON: 'Polygon' }[match[2].toUpperCase()];
+
+  // Turn "((1 2, 3 4), (5 6))" into nested arrays [[[1,2],[3,4]],[[5,6]]].
+  let pos = 0;
+  const body = match[4];
+  function list() {
+    pos++; // "("
+    const items = [];
+    while (true) {
+      while (/[\s,]/.test(body[pos])) pos++;
+      if (body[pos] === ')') { pos++; return items; }
+      if (body[pos] === '(') { items.push(list()); continue; }
+      const end = body.slice(pos).search(/[,)]/);
+      items.push(body.slice(pos, pos + end).trim().split(/\s+/).map(Number).slice(0, 2));
+      pos += end;
+    }
+  }
+  let coords = list();
+  if (type === 'Point') coords = coords[0];
+  // MULTIPOINT may be written "(1 2, 3 4)" or "((1 2), (3 4))".
+  if (type === 'MultiPoint') coords = coords.map(c => Array.isArray(c[0]) ? c[0] : c);
+  return { type, coordinates: coords };
+}
+
+function toGeometry(term) {
+  if (term.datatype === WKT) return parseWkt(term.value);
+  if (term.datatype === GEOJSON) return JSON.parse(term.value);
+  return null;
+}
+
+// --- Map ---------------------------------------------------------------------
+
+const map = L.map('map', { zoomControl: true }).setView([48, 4], 5);
+// Esri tiles need no API key and no Referer, so they also work when this file
+// is opened from disk. (CARTO now requires a key; OSM may refuse file:// pages.)
+const esri = (service, attribution) => L.tileLayer(
+  `https://server.arcgisonline.com/ArcGIS/rest/services/${service}/MapServer/tile/{z}/{y}/{x}`,
+  { maxZoom: 16, attribution });
+const basemaps = {
+  'Light gray': esri('Canvas/World_Light_Gray_Base', 'Tiles © Esri, HERE, Garmin, © OpenStreetMap contributors'),
+  'Topographic': esri('World_Topo_Map', 'Tiles © Esri and contributors'),
+  'Satellite': esri('World_Imagery', 'Tiles © Esri, Maxar, Earthstar Geographics'),
+  'OpenStreetMap': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '© OpenStreetMap contributors' }),
+};
+basemaps['Light gray'].addTo(map);
+const results = L.featureGroup().addTo(map);
+L.control.layers(basemaps, { Results: results }, { position: 'topright' }).addTo(map);
+
+// Fullscreen button, under the layer switcher.
+const Fullscreen = L.Control.extend({
+  options: { position: 'topright' },
+  onAdd() {
+    const bar = L.DomUtil.create('div', 'leaflet-bar');
+    const a = L.DomUtil.create('a', 'fs-button', bar);
+    a.href = '#';
+    a.title = 'Fullscreen (F)';
+    a.textContent = '⛶';
+    L.DomEvent.on(a, 'click', e => { L.DomEvent.preventDefault(e); toggleFullscreen(); });
+    L.DomEvent.disableClickPropagation(bar);
+    return bar;
+  },
+});
+map.addControl(new Fullscreen());
+
+function toggleFullscreen() {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen?.();
+}
+document.addEventListener('fullscreenchange', () => map.invalidateSize());
+
+// --- Query and draw ----------------------------------------------------------
+
+const $ = id => document.getElementById(id);
+const endpointEl = $('endpoint');
+const queryEl = $('query');
+const statusEl = $('status');
+
+endpointEl.value = store.get('dots-map.endpoint') || DEFAULT_ENDPOINT;
+queryEl.value = store.get('dots-map.query') || DEFAULT_QUERY;
+
+function setStatus(text, isError = false) {
+  statusEl.textContent = text;
+  statusEl.classList.toggle('error', isError);
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+async function run() {
+  store.set('dots-map.endpoint', endpointEl.value);
+  store.set('dots-map.query', queryEl.value);
+  setStatus('Running…');
+
+  let json;
+  try {
+    const response = await fetch(endpointEl.value, {
+      method: 'POST',
+      headers: { 'Accept': 'application/sparql-results+json' },
+      body: new URLSearchParams({ query: queryEl.value }),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ${(await response.text()).trim().slice(0, 200)}`);
+    json = await response.json();
+  } catch (err) {
+    setStatus(err.message.includes('Failed to fetch')
+      ? 'Cannot reach Fuseki. Is the container running?' : err.message, true);
+    return;
+  }
+
+  const rows = json.results?.bindings ?? [];
+  const vars = json.head?.vars ?? [];
+  results.clearLayers();
+
+  let shapes = 0, skipped = 0;
+  for (const row of rows) {
+    const color = row.wktColor?.value || DEFAULT_COLOR;
+    const labelVar = row.wktLabel ? 'wktLabel'
+      : vars.find(v => row[v]?.type === 'literal' && !row[v].datatype && v !== 'wktColor');
+    const label = labelVar ? row[labelVar].value : null;
+    const popup = vars.filter(v => row[v]).map(v => {
+      const value = row[v].value;
+      return `<b>${escapeHtml(v)}:</b> ${escapeHtml(value.length > 120 ? value.slice(0, 120) + '…' : value)}`;
+    }).join('<br>');
+
+    for (const v of vars) {
+      if (!row[v]) continue;
+      let geometry;
+      try { geometry = toGeometry(row[v]); } catch { skipped++; continue; }
+      if (!geometry) continue;
+
+      const layer = L.geoJSON({ type: 'Feature', geometry, properties: {} }, {
+        style: { color, fillColor: color, weight: 2, opacity: 0.8, fillOpacity: 0.35 },
+        pointToLayer: (_, latlng) => L.circleMarker(latlng, {
+          radius: 5, color, fillColor: color, weight: 2, fillOpacity: 0.6 }),
+      }).bindPopup(popup);
+      if (label) {
+        layer.bindTooltip(escapeHtml(label), {
+          permanent: true, direction: 'center', className: 'dots-label' });
+      }
+      results.addLayer(layer);
+      shapes++;
+    }
+  }
+
+  if (shapes) map.fitBounds(results.getBounds(), { padding: [30, 30], maxZoom: 14 });
+  const note = skipped ? `, ${skipped} unreadable` : '';
+  setStatus(rows.length === 0
+    ? 'No results. Did the server restart? Re-run insert-countries.ru.'
+    : `${rows.length} row${rows.length > 1 ? 's' : ''}, ${shapes} shape${shapes === 1 ? '' : 's'}${note}`,
+    rows.length === 0 || shapes === 0);
+}
+
+// --- Wiring ------------------------------------------------------------------
+
+$('run').addEventListener('click', run);
+$('reset').addEventListener('click', () => {
+  endpointEl.value = DEFAULT_ENDPOINT;
+  queryEl.value = DEFAULT_QUERY;
+  run();
+});
+queryEl.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); run(); }
+});
+$('toggle').addEventListener('click', () => {
+  const collapsed = $('panel').classList.toggle('collapsed');
+  $('chevron').textContent = collapsed ? '▼ show' : '▲ hide';
+});
+document.addEventListener('keydown', e => {
+  const typing = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
+  if (!typing && (e.key === 'f' || e.key === 'F')) toggleFullscreen();
+});
+
+run();
+</script>
+</body>
+</html>

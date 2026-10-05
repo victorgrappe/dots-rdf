@@ -1,0 +1,21 @@
+# GeoSPARQL: every pair of countries, with their spatial relation and the
+# distance between their borders. Run insert-countries.ru first.
+
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX geo:  <http://www.opengis.net/ont/geosparql#>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+PREFIX uom:  <http://www.opengis.net/def/uom/OGC/1.0/>
+PREFIX xsd:  <http://www.w3.org/2001/XMLSchema#>
+PREFIX dot:  <http://dots.local/dot/>
+
+SELECT ?a ?b ?touches ?intersects
+       (xsd:integer(ROUND(geof:distance(?wktA, ?wktB, uom:metre) / 1000)) AS ?distance_km)
+WHERE {
+  ?countryA a dot:Country ; rdfs:label ?a ; geo:hasGeometry/geo:asWKT ?wktA .
+  ?countryB a dot:Country ; rdfs:label ?b ; geo:hasGeometry/geo:asWKT ?wktB .
+  FILTER (?a < ?b)
+
+  BIND (geof:sfTouches(?wktA, ?wktB)    AS ?touches)
+  BIND (geof:sfIntersects(?wktA, ?wktB) AS ?intersects)
+}
+ORDER BY ?a ?b
