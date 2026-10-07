@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dots persons</title>
+<!--
+  View and edit the persons of the "persons" dataset with a form generated
+  from SHACL shapes, by shacl-form (https://github.com/ULB-Darmstadt/shacl-form).
+
+  Everything comes from Fuseki:
+    - shapes: named graph <http://dots.local/persons/shapes> (shacl/persons.ttl)
+    - data:   default graph (ttl/persons.ttl)
+  Save writes back with a SPARQL update. "Validate dataset" asks Fuseki's
+  SHACL endpoint to check the whole default graph.
+
+  Open the file directly (`open persons/index.html`): Fuseki allows CORS.
+-->
+<script src="https://cdn.jsdelivr.net/npm/@ulb-darmstadt/shacl-form@3.7.3/dist/bundle.js" type="module"></script>
+<style>
+  :root {
+    --bg: #f2f2f5;
+    --panel-bg: #ffffff;
+    --fg: #1d1d1f;
+    --muted: #6b6b70;
+    --border: #d6d6db;
+    --alt-bg: #f6f6f8;
+    --accent: #1f6feb;
+    --accent-fg: #ffffff;
+    --error: #c62828;
+    --ok: #2e7d32;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1c1c1e;
+      --panel-bg: #2a2a2d;
+      --fg: #f2f2f7;
+      --muted: #a1a1a8;
+      --border: #3a3a3f;
+      --alt-bg: #313135;
+      --accent: #4c8dff;
+      --accent-fg: #ffffff;
+      --error: #ff6b6b;
+      --ok: #66bb6a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1c1c1e;
+    --panel-bg: #2a2a2d;
+    --fg: #f2f2f7;
+    --muted: #a1a1a8;
+    --border: #3a3a3f;
+    --alt-bg: #313135;
+    --accent: #4c8dff;
+    --accent-fg: #ffffff;
+    --error: #ff6b6b;
+    --ok: #66bb6a;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px;
+    background: var(--bg); color: var(--fg);
+    font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  h1 { font-size: 18px; margin: 0 0 12px; }
+  h2 { font-size: 13px; margin: 0 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 16px; max-width: 1100px; }
+  @media (max-width: 700px) { .layout { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--panel-bg); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px;
+  }
+  .stack { display: grid; gap: 16px; align-content: start; }
+
+  #persons { list-style: none; margin: 0 0 10px; padding: 0; }
+  #persons li {
+    display: flex; justify-content: space-between; gap: 8px;
+    padding: 6px 8px; border-radius: 6px; cursor: pointer;
+  }
+  #persons li:hover { background: var(--alt-bg); }
+  #persons li.selected { background: var(--accent); color: var(--accent-fg); }
+  .badge { color: var(--error); font-size: 12px; }
+  #persons li.selected .badge { color: inherit; }
+
+  .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .toolbar .title { flex: 1; font-weight: 600; overflow-wrap: anywhere; }
+  .toolbar .iri { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); font-weight: 400; }
+  button {
+    border: 1px solid var(--border); border-radius: 6px; padding: 5px 12px;
+    background: var(--panel-bg); color: var(--fg); font: inherit; cursor: pointer;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+  button.danger { color: var(--error); }
+  button:disabled { opacity: .5; cursor: default; }
+  .status { font-size: 12px; color: var(--muted); min-height: 1.4em; }
+  .status.error { color: var(--error); }
+  .status.ok { color: var(--ok); }
+
+  shacl-form {
+    --shacl-text-color: var(--fg);
+    --shacl-muted-color: var(--muted);
+    --shacl-border-color: var(--border);
+    --shacl-bg: var(--panel-bg);
+    --shacl-row-alt-bg: var(--alt-bg);
+    --shacl-error-color: var(--error);
+    --shacl-label-width: 8em;
+  }
+  .empty { color: var(--muted); padding: 24px 0; text-align: center; }
+
+  pre {
+    margin: 0; padding: 8px; overflow: auto; max-height: 320px;
+    background: var(--alt-bg); border-radius: 6px;
+    font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  details summary { cursor: pointer; color: var(--muted); margin-bottom: 6px; }
+  #report { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  #report li { font-size: 13px; }
+  #report code { font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<h1>Persons <span class="iri">— SHACL + shacl-form</span></h1>
+
+<div class="layout">
+  <div class="stack">
+    <section class="card">
+      <h2>Persons</h2>
+      <ul id="persons"></ul>
+      <button id="new" type="button">+ New person</button>
+    </section>
+    <section class="card">
+      <h2>Fuseki validation</h2>
+      <button id="validate" type="button">Validate dataset</button>
+      <p class="status" id="report-status"></p>
+      <ul id="report"></ul>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="card">
+      <div class="toolbar">
+        <span class="title" id="title">Select a person</span>
+        <button id="edit" type="button" hidden>Edit</button>
+        <button id="delete" type="button" class="danger" hidden>Delete</button>
+        <button id="cancel" type="button" hidden>Cancel</button>
+        <button id="save" type="button" class="primary" hidden>Save</button>
+      </div>
+      <div class="status" id="status"></div>
+      <div id="form-host"><p class="empty">Pick a person on the left, or create one.</p></div>
+    </section>
+    <section class="card">
+      <details>
+        <summary>Turtle produced by the form</summary>
+        <pre id="turtle"></pre>
+      </details>
+    </section>
+  </div>
+</div>
+
+<script>
+const FUSEKI = 'http://localhost:3030/persons';
+const SHAPES_GRAPH = 'http://dots.local/persons/shapes';
+const SHAPE = 'http://dots.local/persons/shapes#PersonShape';
+const PERSON_NS = 'http://dots.local/person/';
+const FOAF = 'http://xmlns.com/foaf/0.1/';
+const SH = 'http://www.w3.org/ns/shacl#';
+
+const $ = id => document.getElementById(id);
+const state = { shapes: '', data: '', persons: [], invalid: new Map(), subject: null, mode: null, isNew: false };
+
+// --- Fuseki ------------------------------------------------------------------
+
+async function call(url, options = {}) {
+  let response;
+  try {
+    response = await fetch(url, options);
+  } catch {
+    throw new Error('Cannot reach Fuseki. Is the container running?');
+  }
+  if (!response.ok) throw new Error(`HTTP ${response.status}: ${(await response.text()).trim().slice(0, 200)}`);
+  return response;
+}
+
+const getGraph = graph => call(`${FUSEKI}/get?${graph ? 'graph=' + encodeURIComponent(graph) : 'default'}`,
+  { headers: { Accept: 'text/turtle' } }).then(r => r.text());
+
+async function select(query) {
+  const response = await call(`${FUSEKI}/sparql`, {
+    method: 'POST',
+    headers: { Accept: 'application/sparql-results+json' },
+    body: new URLSearchParams({ query }),
+  });
+  return (await response.json()).results.bindings;
+}
+
+const update = text => call(`${FUSEKI}/update`, { method: 'POST', body: new URLSearchParams({ update: text }) });
+
+// --- Status ------------------------------------------------------------------
+
+function setStatus(el, text, kind = '') {
+  el.textContent = text;
+  el.className = 'status' + (kind ? ' ' + kind : '');
+}
+
+// --- Person list ---------------------------------------------------------------
+
+async function loadAll() {
+  [state.shapes, state.data] = await Promise.all([getGraph(SHAPES_GRAPH), getGraph(null)]);
+  const rows = await select(`
+    PREFIX foaf: <${FOAF}>
+    SELECT ?p ?name WHERE { ?p a foaf:Person OPTIONAL { ?p foaf:name ?name } }
+    ORDER BY LCASE(STR(?name))`);
+  state.persons = rows.map(r => ({ iri: r.p.value, name: r.name?.value || localName(r.p.value) }));
+  renderList();
+}
+
+function localName(iri) { return iri.replace(/^.*[/#]/, ''); }
+
+function renderList() {
+  const ul = $('persons');
+  ul.replaceChildren(...state.persons.map(p => {
+    const li = document.createElement('li');
+    li.className = p.iri === state.subject ? 'selected' : '';
+    const name = document.createElement('span');
+    name.textContent = p.name;
+    li.append(name);
+    const errors = state.invalid.get(p.iri);
+    if (errors) {
+      const badge = document.createElement('span');
+      badge.className = 'badge';
+      badge.textContent = `⚠ ${errors}`;
+      badge.title = `${errors} SHACL violation${errors > 1 ? 's' : ''}`;
+      li.append(badge);
+    }
+    li.addEventListener('click', () => show(p.iri, 'view'));
+    return li;
+  }));
+}
+
+// --- Form ----------------------------------------------------------------------
+
+// A fresh <shacl-form> each time: simpler than re-binding attributes.
+function show(subject, mode, isNew = false) {
+  Object.assign(state, { subject, mode, isNew });
+  const person = state.persons.find(p => p.iri === subject);
+  $('title').innerHTML = '';
+  $('title').append(isNew ? 'New person' : person?.name || localName(subject), ' ');
+  const iri = document.createElement('span');
+  iri.className = 'iri';
+  iri.textContent = subject;
+  $('title').append(iri);
+
+  const editing = mode === 'edit';
+  $('edit').hidden = editing;
+  $('delete').hidden = editing;
+  $('save').hidden = !editing;
+  $('cancel').hidden = !editing;
+  setStatus($('status'), '');
+
+  const form = document.createElement('shacl-form');
+  form.dataset.shapes = state.shapes;
+  form.dataset.shapeSubject = SHAPE;
+  // The whole default graph: the form takes the person's own values, and
+  // the other persons' names for the relation dropdowns and links.
+  form.dataset.values = state.data;
+  form.dataset.valuesSubject = subject;
+  form.dataset.generateNodeShapeReference = ''; // no dcterms:conformsTo triple
+  form.dataset.language = 'en';
+  if (!editing) form.dataset.view = '';
+  form.addEventListener('change', event => {
+    showTurtle(form);
+    if (editing) {
+      const valid = event.detail?.valid;
+      setStatus($('status'), valid ? 'Valid' : 'Not valid yet: see the marks next to the fields', valid ? 'ok' : 'error');
+    }
+  });
+  $('form-host').replaceChildren(form);
+  // The form renders asynchronously: show its Turtle once it is ready.
+  setTimeout(() => showTurtle(form), 300);
+  renderList();
+}
+
+function showTurtle(form) {
+  try { $('turtle').textContent = form.serialize('text/turtle'); } catch { /* still loading */ }
+}
+
+async function save() {
+  const form = $('form-host').querySelector('shacl-form');
+  const report = await form.validate();
+  if (!report.conforms) {
+    setStatus($('status'), 'Not saved: fix the fields marked invalid first.', 'error');
+    return;
+  }
+  const s = `<${state.subject}>`;
+  const triples = form.serialize('application/n-triples');
+  try {
+    // Replace every triple about the person, in one request.
+    await update(`DELETE WHERE { ${s} ?p ?o } ;
+INSERT DATA {
+${triples}
+${s} a <${FOAF}Person> .
+}`);
+  } catch (err) {
+    setStatus($('status'), err.message, 'error');
+    return;
+  }
+  await refresh();
+  show(state.subject, 'view');
+  setStatus($('status'), 'Saved.', 'ok');
+}
+
+async function remove() {
+  const name = state.persons.find(p => p.iri === state.subject)?.name || state.subject;
+  if (!confirm(`Delete ${name}, and every relation pointing to them?`)) return;
+  const s = `<${state.subject}>`;
+  try {
+    await update(`DELETE WHERE { ${s} ?p ?o } ; DELETE WHERE { ?x ?p ${s} }`);
+  } catch (err) {
+    setStatus($('status'), err.message, 'error');
+    return;
+  }
+  state.subject = null;
+  await refresh();
+  $('title').textContent = 'Select a person';
+  ['edit', 'delete', 'save', 'cancel'].forEach(id => $(id).hidden = true);
+  $('form-host').innerHTML = '<p class="empty">Deleted.</p>';
+  $('turtle').textContent = '';
+}
+
+// --- Validation by Fuseki ---------------------------------------------------------
+
+// POST the shapes to /shacl; the report comes back as N-Triples, easy to read
+// line by line.
+async function validateDataset() {
+  setStatus($('report-status'), 'Validating…');
+  let text;
+  try {
+    const response = await call(`${FUSEKI}/shacl?graph=default`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/turtle', Accept: 'application/n-triples' },
+      body: state.shapes,
+    });
+    text = await response.text();
+  } catch (err) {
+    setStatus($('report-status'), err.message, 'error');
+    return;
+  }
+
+  const nodes = {};
+  for (const line of text.split('\n')) {
+    const m = line.match(/^(\S+) <([^>]+)> (.+) \.$/);
+    if (!m) continue;
+    const [, s, p, o] = m;
+    (nodes[s] ??= {})[p] = o.replace(/^<(.*)>$/, '$1').replace(/^"(.*)"(\^\^.*|@.*)?$/, (_, v) => JSON.parse(`"${v}"`));
+  }
+  const results = Object.values(nodes).filter(n => n[SH + 'focusNode']);
+  state.invalid = new Map();
+  for (const r of results) {
+    const focus = r[SH + 'focusNode'];
+    state.invalid.set(focus, (state.invalid.get(focus) || 0) + 1);
+  }
+
+  $('report').replaceChildren(...results.map(r => {
+    const li = document.createElement('li');
+    const who = state.persons.find(p => p.iri === r[SH + 'focusNode'])?.name || r[SH + 'focusNode'];
+    const b = document.createElement('b');
+    b.textContent = who;
+    const path = document.createElement('code');
+    path.textContent = ' ' + localName(r[SH + 'resultPath'] || '');
+    li.append(b, path, document.createElement('br'), r[SH + 'resultMessage'] || '');
+    return li;
+  }));
+  setStatus($('report-status'), results.length
+    ? `${results.length} violation${results.length > 1 ? 's' : ''}`
+    : 'The dataset conforms to the shapes.', results.length ? 'error' : 'ok');
+  renderList();
+}
+
+async function refresh() {
+  await loadAll();
+  await validateDataset();
+}
+
+// --- Wiring ------------------------------------------------------------------------
+
+$('new').addEventListener('click', () => show(PERSON_NS + crypto.randomUUID().slice(0, 8), 'edit', true));
+$('edit').addEventListener('click', () => show(state.subject, 'edit'));
+$('cancel').addEventListener('click', () => {
+  if (!state.isNew) return show(state.subject, 'view');
+  state.subject = null;
+  $('title').textContent = 'Select a person';
+  ['save', 'cancel'].forEach(id => $(id).hidden = true);
+  setStatus($('status'), '');
+  $('form-host').innerHTML = '<p class="empty">Pick a person on the left, or create one.</p>';
+  $('turtle').textContent = '';
+});
+$('save').addEventListener('click', save);
+$('delete').addEventListener('click', remove);
+$('validate').addEventListener('click', validateDataset);
+
+refresh().catch(err => setStatus($('report-status'), err.message, 'error'));
+</script>
+</body>
+</html>

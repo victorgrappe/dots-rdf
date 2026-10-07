@@ -22,3 +22,23 @@ PREFIX rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 
 <#dataset> rdf:type ja:MemoryDataset ;
     ja:data "/data/ttl/dots.ttl" .
+
+# Second dataset, "persons": a SHACL / shacl-form showcase.
+# Data in the default graph, shapes in a named graph. The `shacl` endpoint
+# validates a graph against shapes POSTed to it.
+
+<#persons> rdf:type fuseki:Service ;
+    fuseki:name "persons" ;
+    fuseki:endpoint [ fuseki:operation fuseki:query  ; fuseki:name "sparql" ] ;
+    fuseki:endpoint [ fuseki:operation fuseki:update ; fuseki:name "update" ] ;
+    fuseki:endpoint [ fuseki:operation fuseki:gsp-r  ; fuseki:name "get"    ] ;
+    fuseki:endpoint [ fuseki:operation fuseki:gsp-rw ; fuseki:name "data"   ] ;
+    fuseki:endpoint [ fuseki:operation fuseki:shacl  ; fuseki:name "shacl"  ] ;
+    fuseki:dataset <#personsDataset> .
+
+<#personsDataset> rdf:type ja:MemoryDataset ;
+    ja:data "/data/ttl/persons.ttl" ;
+    ja:namedGraph [
+        ja:graphName <http://dots.local/persons/shapes> ;
+        ja:data "/data/shacl/persons.ttl"
+    ] .

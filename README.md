@@ -11,13 +11,18 @@ dots-rdf/
 ├── docker-compose.yml       # one service, port 3030 on localhost
 ├── jena/
 │   ├── Dockerfile           # Fuseki 6.2.0 on Java 21, from the Apache binary release
-│   ├── config.ttl           # the "dots" dataset: in memory, loaded from ttl/
+│   ├── config.ttl           # the "dots" and "persons" datasets: in memory, loaded from files
 │   └── shiro.ini            # access control: open, for local use
 ├── map/
 │   └── index.html           # full-window map of a query's geometries
-├── sparql/                  # saved queries (.rq) and updates (.ru)
+├── persons/
+│   └── index.html           # SHACL form to view and edit the persons
+├── shacl/
+│   └── persons.ttl          # SHACL shapes for the persons
+├── sparql/                  # saved queries (.rq) and updates (.ru), for /dots
 └── ttl/
-    └── dots.ttl             # the graph
+    ├── dots.ttl             # the graph
+    └── persons.ttl          # persons and their relations (SHACL showcase)
 ```
 
 ## Run
@@ -179,6 +184,87 @@ It follows the same conventions as the web UI's 🌍 **Geo** tab:
 - a column named `wktColor` sets the colour;
 - a column named `wktLabel` sets the label (otherwise the first plain-text column);
 - clicking a shape shows its whole row.
+
+## Persons: SHACL and shacl-form
+
+A small second dataset, `/persons`, to show SHACL at work. It is separate from
+`/dots`, so the saved queries in `sparql/` are not affected.
+
+| File | Role |
+| --- | --- |
+| `ttl/persons.ttl` | five persons ([FOAF](http://xmlns.com/foaf/0.1/)) and their relations: `foaf:knows`, `rel:spouseOf`, `rel:parentOf` ([REL](http://purl.org/vocab/relationship/)) |
+| `shacl/persons.ttl` | the shapes: a name is required, age is 0–150, e-mail is a `mailto:` IRI, relations point to a `foaf:Person`, at most one spouse, spouse and children are disjoint |
+| `persons/index.html` | a form generated from the shapes by [shacl-form](https://github.com/ULB-Darmstadt/shacl-form) |
+
+At startup Fuseki loads the persons into the default graph and the shapes into
+the named graph `<http://dots.local/persons/shapes>`. Eve breaks three
+constraints on purpose, so validation has something to show.
+
+### Validate with Fuseki
+
+The `/persons/shacl` endpoint validates a graph against shapes POSTed to it, and
+returns a SHACL validation report:
+
+```bash
+curl -s -X POST 'http://localhost:3030/persons/shacl?graph=default' \
+  -H 'Content-Type: text/turtle' --data-binary @shacl/persons.ttl
+```
+
+`sh:conforms false`, with one `sh:result` per violation: Eve's age, e-mail and
+second spouse.
+
+### Edit with the form
+
+```bash
+open persons/index.html
+```
+
+- The list on the left shows every `foaf:Person`. A ⚠ marks the persons with violations.
+- Click a person to view them. **Edit** turns the view into a form. The form
+  validates as you type and marks invalid fields. **Save** is refused until
+  the form is valid. It then replaces the person's triples with a SPARQL update.
+- **+ New person** opens an empty form with a fresh IRI under `http://dots.local/person/`.
+- **Validate dataset** runs the Fuseki validation above on the whole graph.
+- *Turtle produced by the form* shows the RDF the form would save.
+
+The form is built from the shapes alone: `sh:name` gives the labels,
+`sh:order` the order, `sh:datatype` the input type, and `sh:class` the
+dropdowns of persons. Edit a shape, reload the shapes graph (see below), then
+reload the page.
+
+Like every dataset here, `/persons` is in memory: edits are lost on restart.
+To keep them, export the default graph into `ttl/persons.ttl` (see below).
+
+## Import, clear, export
+
+These use the Graph Store Protocol (`/data`) and SPARQL Update (`/update`).
+Replace `persons` with `dots` for the other dataset.
+
+The standard formats: **Turtle** (`.ttl`) for one graph, and **N-Quads**
+(`.nq`) for a whole dataset, named graphs included. N-Quads is also what
+Fuseki backups contain.
+
+```bash
+B=http://localhost:3030/persons
+
+# Export
+curl -s "$B/data?default" -H 'Accept: text/turtle' > persons.ttl            # default graph
+curl -s "$B/data?graph=http://dots.local/persons/shapes" -H 'Accept: text/turtle' > shapes.ttl
+curl -s "$B/data" -H 'Accept: application/n-quads' > persons.nq             # whole dataset
+
+# Clear
+curl -s "$B/update" --data-urlencode 'update=CLEAR DEFAULT'                 # default graph only
+curl -s "$B/update" --data-urlencode 'update=DROP ALL'                      # everything
+
+# Import: POST adds to what is there, PUT replaces it
+curl -s -X PUT  "$B/data?default" -H 'Content-Type: text/turtle' --data-binary @ttl/persons.ttl
+curl -s -X PUT  "$B/data?graph=http://dots.local/persons/shapes" -H 'Content-Type: text/turtle' --data-binary @shacl/persons.ttl
+curl -s -X POST "$B/data" -H 'Content-Type: application/n-quads' --data-binary @persons.nq
+```
+
+For TriG instead of N-Quads, use `application/trig`. To take a gzipped N-Quads
+backup on the server side, `curl -X POST http://localhost:3030/$/backup/persons`.
+It lands in `/fuseki/run/backups` inside the container.
 
 ## Upgrading Fuseki
 

@@ -1,0 +1,80 @@
+# SHACL shapes for ttl/persons.ttl.
+#
+# They serve twice:
+#   - Fuseki validates the dataset against them (POST to /persons/shacl);
+#   - persons/index.html builds its form from them, with shacl-form.
+#     sh:name, sh:description and sh:order only drive the form; validation
+#     ignores them.
+#
+# Loaded into the named graph <http://dots.local/persons/shapes> of /persons,
+# so the form page can fetch them from Fuseki.
+
+PREFIX sh:     <http://www.w3.org/ns/shacl#>
+PREFIX rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs:   <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX xsd:    <http://www.w3.org/2001/XMLSchema#>
+PREFIX foaf:   <http://xmlns.com/foaf/0.1/>
+PREFIX rel:    <http://purl.org/vocab/relationship/>
+PREFIX shapes: <http://dots.local/persons/shapes#>
+
+shapes:PersonShape a sh:NodeShape ;
+    rdfs:label "Person" ;
+    sh:targetClass foaf:Person ;
+
+    # Exactly one name, at least 2 characters.
+    sh:property [
+        sh:path foaf:name ;
+        sh:name "Name" ;
+        sh:order 1 ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 2 ;
+    ] ;
+
+    # Optional age, a whole number from 0 to 150.
+    sh:property [
+        sh:path foaf:age ;
+        sh:name "Age" ;
+        sh:order 2 ;
+        sh:datatype xsd:integer ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0 ;
+        sh:maxInclusive 150 ;
+    ] ;
+
+    # Optional e-mail, as a mailto: IRI.
+    sh:property [
+        sh:path foaf:mbox ;
+        sh:name "E-mail" ;
+        sh:description "A mailto: IRI, e.g. mailto:alice@example.org" ;
+        sh:order 3 ;
+        sh:nodeKind sh:IRI ;
+        sh:maxCount 1 ;
+        sh:pattern "^mailto:[^@\\s]+@[^@\\s]+$" ;
+    ] ;
+
+    # Relations: each one points to another foaf:Person.
+    sh:property [
+        sh:path rel:spouseOf ;
+        sh:name "Spouse" ;
+        sh:order 10 ;
+        sh:class foaf:Person ;
+        sh:nodeKind sh:IRI ;
+        sh:maxCount 1 ;
+        sh:disjoint rel:parentOf ;  # nobody is both your spouse and your child
+    ] ;
+    sh:property [
+        sh:path rel:parentOf ;
+        sh:name "Parent of" ;
+        sh:order 11 ;
+        sh:class foaf:Person ;
+        sh:nodeKind sh:IRI ;
+    ] ;
+    sh:property [
+        sh:path foaf:knows ;
+        sh:name "Knows" ;
+        sh:order 12 ;
+        sh:class foaf:Person ;
+        sh:nodeKind sh:IRI ;
+    ] .

@@ -1,0 +1,49 @@
+# Persons and their relations: the data of the "persons" dataset.
+#
+# Loaded into the default graph of /persons at startup. The shapes that
+# constrain it are in shacl/persons.ttl.
+#
+# Vocabularies:
+#   FOAF for persons      http://xmlns.com/foaf/0.1/
+#   REL  for family ties  http://purl.org/vocab/relationship/
+#
+# Eve breaks the shapes on purpose, so validation has something to report.
+
+PREFIX foaf:   <http://xmlns.com/foaf/0.1/>
+PREFIX rel:    <http://purl.org/vocab/relationship/>
+PREFIX xsd:    <http://www.w3.org/2001/XMLSchema#>
+PREFIX person: <http://dots.local/person/>
+
+person:alice a foaf:Person ;
+    foaf:name "Alice Martin" ;
+    foaf:age 62 ;
+    foaf:mbox <mailto:alice@example.org> ;
+    rel:spouseOf person:bob ;
+    rel:parentOf person:carol , person:dave ;
+    foaf:knows person:bob , person:eve .
+
+person:bob a foaf:Person ;
+    foaf:name "Bob Martin" ;
+    foaf:age 64 ;
+    rel:spouseOf person:alice ;
+    rel:parentOf person:carol , person:dave ;
+    foaf:knows person:alice .
+
+person:carol a foaf:Person ;
+    foaf:name "Carol Martin" ;
+    foaf:age 34 ;
+    foaf:mbox <mailto:carol@example.org> ;
+    foaf:knows person:dave , person:eve .
+
+person:dave a foaf:Person ;
+    foaf:name "Dave Martin" ;
+    foaf:age 31 ;
+    foaf:knows person:carol .
+
+# Invalid: age out of range, mbox is not a mailto: IRI, and two spouses.
+person:eve a foaf:Person ;
+    foaf:name "Eve Durand" ;
+    foaf:age 212 ;
+    foaf:mbox <http://example.org/eve> ;
+    rel:spouseOf person:carol , person:dave ;
+    foaf:knows person:alice , person:carol .

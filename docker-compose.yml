@@ -10,4 +10,5 @@ services:
       - ./jena/config.ttl:/fuseki/config.ttl:ro
       - ./jena/shiro.ini:/fuseki/run/shiro.ini:ro
       - ./ttl:/data/ttl:ro
+      - ./shacl:/data/shacl:ro
     restart: unless-stopped
