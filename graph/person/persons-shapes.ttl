@@ -1,8 +1,8 @@
-# SHACL shapes for ttl/persons.ttl.
+# SHACL shapes for persons.ttl, next to this file.
 #
 # They serve twice:
 #   - Fuseki validates the dataset against them (POST to /persons/shacl);
-#   - persons/index.html builds its form from them, with shacl-form.
+#   - index.html, next to this file, builds its form from them, with shacl-form.
 #     sh:name, sh:description and sh:order only drive the form; validation
 #     ignores them.
 #

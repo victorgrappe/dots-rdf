@@ -9,12 +9,12 @@
   from SHACL shapes, by shacl-form (https://github.com/ULB-Darmstadt/shacl-form).
 
   Everything comes from Fuseki:
-    - shapes: named graph <http://dots.local/persons/shapes> (shacl/persons.ttl)
-    - data:   default graph (ttl/persons.ttl)
+    - shapes: named graph <http://dots.local/persons/shapes> (persons-shapes.ttl)
+    - data:   default graph (persons.ttl)
   Save writes back with a SPARQL update. "Validate dataset" asks Fuseki's
   SHACL endpoint to check the whole default graph.
 
-  Open the file directly (`open persons/index.html`): Fuseki allows CORS.
+  Open the file directly (`open graph/person/index.html`): Fuseki allows CORS.
 -->
 <script src="https://cdn.jsdelivr.net/npm/@ulb-darmstadt/shacl-form@3.7.3/dist/bundle.js" type="module"></script>
 <style>

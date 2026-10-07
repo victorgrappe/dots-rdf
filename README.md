@@ -13,16 +13,22 @@ dots-rdf/
 │   ├── Dockerfile           # Fuseki 6.2.0 on Java 21, from the Apache binary release
 │   ├── config.ttl           # the "dots" and "persons" datasets: in memory, loaded from files
 │   └── shiro.ini            # access control: open, for local use
-├── map/
-│   └── index.html           # full-window map of a query's geometries
-├── persons/
-│   └── index.html           # SHACL form to view and edit the persons
-├── shacl/
-│   └── persons.ttl          # SHACL shapes for the persons
-├── sparql/                  # saved queries (.rq) and updates (.ru), for /dots
-└── ttl/
-    ├── dots.ttl             # the graph
-    └── persons.ttl          # persons and their relations (SHACL showcase)
+└── graph/                   # mounted in Fuseki at /data/graph
+    ├── dots/                # the /dots dataset
+    │   ├── dots.ttl         # the graph
+    │   ├── instances.rq
+    │   └── link-dots.rq
+    ├── map/                 # countries, inserted into /dots
+    │   ├── index.html       # full-window map of a query's geometries
+    │   ├── insert-countries.ru
+    │   ├── countries-geo.rq
+    │   └── countries-map.rq
+    ├── person/              # the /persons dataset (SHACL showcase)
+    │   ├── index.html       # SHACL form to view and edit the persons
+    │   ├── persons.ttl      # persons and their relations
+    │   └── persons-shapes.ttl  # SHACL shapes for the persons
+    └── _tmp/
+        └── class-hierarchy.rq
 ```
 
 ## Run
@@ -48,9 +54,10 @@ docker compose down
 
 The first build downloads Fuseki (about 50 MB). In the logs, wait for `Start Fuseki`.
 
-**The dataset is in memory.** It is reloaded from `ttl/dots.ttl` each time the
-container starts. Edit the file, then run `docker compose restart`. SPARQL updates
-work, but they are lost on restart. The Turtle file is the source of truth.
+**The datasets are in memory.** They are reloaded from the Turtle files in
+`graph/` each time the container starts. Edit a file, then run
+`docker compose restart`. SPARQL updates work, but they are lost on restart.
+The Turtle files are the source of truth.
 
 ### Endpoints
 
@@ -62,17 +69,12 @@ work, but they are lost on restart. The Turtle file is the source of truth.
 | Graph Store, read/write | <http://localhost:3030/dots/data> |
 | Graph Store, read only | <http://localhost:3030/dots/get> |
 
-### Sparql
-
-```bash
-clear; curl -s http://localhost:3030/dots/sparql \
-  -H 'Accept: text/csv' \
-  --data-urlencode 'query=SELECT * WHERE { ?s ?p ?o } LIMIT 10'
-```
+`/persons` has the same endpoints (but no `/query` alias), plus
+`/persons/shacl` for SHACL validation.
 
 ## Mapping from the vault
 
-`ttl/dots.ttl` is a hand-written slice of `dots/dot/`. It covers the food
+`graph/dots/dots.ttl` is a hand-written slice of `dots/dot/`. It covers the food
 chain, the matter chain, and one link dot.
 
 | Frontmatter | RDF |
@@ -128,37 +130,37 @@ Results come back in the format named by the `Accept` header: `text/csv`,
 
 ## Saved queries
 
-`sparql/` holds ready-made queries, one per `.rq` file:
+Ready-made queries, one per `.rq` file. They all run against `/dots`:
 
 | File | Returns |
 | --- | --- |
-| `class-hierarchy.rq` | every class, its parent (`class:`) and its depth below Dot |
-| `instances.rq` | every `type:` instance, its type and its top-level class |
-| `link-dots.rq` | link dots: `in` → `out`, with `order` and `multiplier` |
-| `insert-countries.ru` | *update*: adds France, Spain and Germany with simplified boundaries |
-| `countries-geo.rq` | GeoSPARQL: each pair of countries, whether they touch, and their distance |
-| `countries-map.rq` | the country polygons, for the 🌍 **Geo** map tab of the web UI |
+| `graph/dots/instances.rq` | every `type:` instance, its type and its top-level class |
+| `graph/dots/link-dots.rq` | link dots: `in` → `out`, with `order` and `multiplier` |
+| `graph/map/insert-countries.ru` | *update*: adds France, Spain and Germany with simplified boundaries |
+| `graph/map/countries-geo.rq` | GeoSPARQL: each pair of countries, whether they touch, and their distance |
+| `graph/map/countries-map.rq` | the country polygons, for the 🌍 **Geo** map tab of the web UI |
+| `graph/_tmp/class-hierarchy.rq` | every class, its parent (`class:`) and its depth below Dot |
 
 Run one from the repository root while the server is up. `query@file` makes curl read the
 query from the file:
 
 ```bash
-curl -s http://localhost:3030/dots/sparql -H 'Accept: text/csv' --data-urlencode 'query@sparql/class-hierarchy.rq'
+curl -s http://localhost:3030/dots/sparql -H 'Accept: text/csv' --data-urlencode 'query@graph/_tmp/class-hierarchy.rq'
 ```
 
 `.ru` files are updates: send them to `/dots/update` as `update@file`. The
-dataset is in memory, so run the insert again after every restart. GeoSPARQL
+datasets are in memory, so run the insert again after every restart. GeoSPARQL
 functions (`geof:`) are built into Fuseki and need no extra setup.
 
 ```bash
-curl -s http://localhost:3030/dots/update --data-urlencode 'update@sparql/insert-countries.ru'
-curl -s http://localhost:3030/dots/sparql -H 'Accept: text/plain' --data-urlencode 'query@sparql/countries-geo.rq'
+curl -s http://localhost:3030/dots/update --data-urlencode 'update@graph/map/insert-countries.ru'
+curl -s http://localhost:3030/dots/sparql -H 'Accept: text/plain' --data-urlencode 'query@graph/map/countries-geo.rq'
 ```
 
 To run all the queries:
 
 ```bash
-for q in sparql/*.rq; do echo "== $q"; curl -s http://localhost:3030/dots/sparql -H 'Accept: text/csv' --data-urlencode "query@$q"; done
+for q in graph/*/*.rq; do echo "== $q"; curl -s http://localhost:3030/dots/sparql -H 'Accept: text/csv' --data-urlencode "query@$q"; done
 ```
 
 For other formats, change the `Accept` header (see [Query](#query)). You can also
@@ -166,15 +168,15 @@ paste a file into the query editor of the web UI.
 
 ## Map
 
-`map/index.html` draws the geometries of a SPARQL query on a full-window map.
+`graph/map/index.html` draws the geometries of a SPARQL query on a full-window map.
 Open it straight from disk while the server is up. Fuseki allows cross-origin
 requests, so no web server is needed:
 
 ```bash
-open map/index.html
+open graph/map/index.html
 ```
 
-It runs `countries-map.rq` on load. Edit the query in the panel and press
+It runs `countries-map.rq` on load (run `insert-countries.ru` first). Edit the query in the panel and press
 **Run** or ⌘+Enter. **Reset** restores the default query. Press **F** or ⛶ for
 fullscreen, and use the layer button to switch background maps.
 
@@ -188,13 +190,14 @@ It follows the same conventions as the web UI's 🌍 **Geo** tab:
 ## Persons: SHACL and shacl-form
 
 A small second dataset, `/persons`, to show SHACL at work. It is separate from
-`/dots`, so the saved queries in `sparql/` are not affected.
+`/dots`, so the saved queries above are not affected. Its files are in
+`graph/person/`.
 
 | File | Role |
 | --- | --- |
-| `ttl/persons.ttl` | five persons ([FOAF](http://xmlns.com/foaf/0.1/)) and their relations: `foaf:knows`, `rel:spouseOf`, `rel:parentOf` ([REL](http://purl.org/vocab/relationship/)) |
-| `shacl/persons.ttl` | the shapes: a name is required, age is 0–150, e-mail is a `mailto:` IRI, relations point to a `foaf:Person`, at most one spouse, spouse and children are disjoint |
-| `persons/index.html` | a form generated from the shapes by [shacl-form](https://github.com/ULB-Darmstadt/shacl-form) |
+| `persons.ttl` | five persons ([FOAF](http://xmlns.com/foaf/0.1/)) and their relations: `foaf:knows`, `rel:spouseOf`, `rel:parentOf` ([REL](http://purl.org/vocab/relationship/)) |
+| `persons-shapes.ttl` | the shapes: a name is required, age is 0–150, e-mail is a `mailto:` IRI, relations point to a `foaf:Person`, at most one spouse, spouse and children are disjoint |
+| `index.html` | a form generated from the shapes by [shacl-form](https://github.com/ULB-Darmstadt/shacl-form) |
 
 At startup Fuseki loads the persons into the default graph and the shapes into
 the named graph `<http://dots.local/persons/shapes>`. Eve breaks three
@@ -207,7 +210,7 @@ returns a SHACL validation report:
 
 ```bash
 curl -s -X POST 'http://localhost:3030/persons/shacl?graph=default' \
-  -H 'Content-Type: text/turtle' --data-binary @shacl/persons.ttl
+  -H 'Content-Type: text/turtle' --data-binary @graph/person/persons-shapes.ttl
 ```
 
 `sh:conforms false`, with one `sh:result` per violation: Eve's age, e-mail and
@@ -216,7 +219,7 @@ second spouse.
 ### Edit with the form
 
 ```bash
-open persons/index.html
+open graph/person/index.html
 ```
 
 - The list on the left shows every `foaf:Person`. A ⚠ marks the persons with violations.
@@ -233,7 +236,8 @@ dropdowns of persons. Edit a shape, reload the shapes graph (see below), then
 reload the page.
 
 Like every dataset here, `/persons` is in memory: edits are lost on restart.
-To keep them, export the default graph into `ttl/persons.ttl` (see below).
+To keep them, export the default graph and copy it into
+`graph/person/persons.ttl` (see below). The export drops the file's comments.
 
 ## Import, clear, export
 
@@ -248,18 +252,18 @@ Fuseki backups contain.
 B=http://localhost:3030/persons
 
 # Export
-curl -s "$B/data?default" -H 'Accept: text/turtle' > persons.ttl            # default graph
-curl -s "$B/data?graph=http://dots.local/persons/shapes" -H 'Accept: text/turtle' > shapes.ttl
-curl -s "$B/data" -H 'Accept: application/n-quads' > persons.nq             # whole dataset
+curl -s "$B/data?default" -H 'Accept: text/turtle' > export.ttl             # default graph
+curl -s "$B/data?graph=http://dots.local/persons/shapes" -H 'Accept: text/turtle' > export-shapes.ttl
+curl -s "$B/data" -H 'Accept: application/n-quads' > export.nq              # whole dataset
 
 # Clear
 curl -s "$B/update" --data-urlencode 'update=CLEAR DEFAULT'                 # default graph only
 curl -s "$B/update" --data-urlencode 'update=DROP ALL'                      # everything
 
 # Import: POST adds to what is there, PUT replaces it
-curl -s -X PUT  "$B/data?default" -H 'Content-Type: text/turtle' --data-binary @ttl/persons.ttl
-curl -s -X PUT  "$B/data?graph=http://dots.local/persons/shapes" -H 'Content-Type: text/turtle' --data-binary @shacl/persons.ttl
-curl -s -X POST "$B/data" -H 'Content-Type: application/n-quads' --data-binary @persons.nq
+curl -s -X PUT  "$B/data?default" -H 'Content-Type: text/turtle' --data-binary @graph/person/persons.ttl
+curl -s -X PUT  "$B/data?graph=http://dots.local/persons/shapes" -H 'Content-Type: text/turtle' --data-binary @graph/person/persons-shapes.ttl
+curl -s -X POST "$B/data" -H 'Content-Type: application/n-quads' --data-binary @export.nq
 ```
 
 For TriG instead of N-Quads, use `application/trig`. To take a gzipped N-Quads

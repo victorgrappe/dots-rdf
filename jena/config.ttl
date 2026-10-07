@@ -1,8 +1,8 @@
 # Fuseki server configuration.
 #
-# One dataset, "dots", held in memory and loaded from ttl/dots.ttl
-# (mounted at /data/ttl) every time the server starts. The Turtle file is
-# the source of truth: SPARQL updates work, but are lost on restart.
+# Two datasets, "dots" and "persons", held in memory and loaded from graph/
+# (mounted at /data/graph) every time the server starts. The Turtle files
+# are the source of truth: SPARQL updates work, but are lost on restart.
 
 PREFIX fuseki: <http://jena.apache.org/fuseki#>
 PREFIX ja:     <http://jena.hpl.hp.com/2005/11/Assembler#>
@@ -21,7 +21,7 @@ PREFIX rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
     fuseki:dataset <#dataset> .
 
 <#dataset> rdf:type ja:MemoryDataset ;
-    ja:data "/data/ttl/dots.ttl" .
+    ja:data "/data/graph/dots/dots.ttl" .
 
 # Second dataset, "persons": a SHACL / shacl-form showcase.
 # Data in the default graph, shapes in a named graph. The `shacl` endpoint
@@ -37,8 +37,8 @@ PREFIX rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
     fuseki:dataset <#personsDataset> .
 
 <#personsDataset> rdf:type ja:MemoryDataset ;
-    ja:data "/data/ttl/persons.ttl" ;
+    ja:data "/data/graph/person/persons.ttl" ;
     ja:namedGraph [
         ja:graphName <http://dots.local/persons/shapes> ;
-        ja:data "/data/shacl/persons.ttl"
+        ja:data "/data/graph/person/persons-shapes.ttl"
     ] .

@@ -9,6 +9,5 @@ services:
     volumes:
       - ./jena/config.ttl:/fuseki/config.ttl:ro
       - ./jena/shiro.ini:/fuseki/run/shiro.ini:ro
-      - ./ttl:/data/ttl:ro
-      - ./shacl:/data/shacl:ro
+      - ./graph:/data/graph:ro
     restart: unless-stopped

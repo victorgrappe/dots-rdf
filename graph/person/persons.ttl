@@ -1,7 +1,7 @@
 # Persons and their relations: the data of the "persons" dataset.
 #
 # Loaded into the default graph of /persons at startup. The shapes that
-# constrain it are in shacl/persons.ttl.
+# constrain it are in persons-shapes.ttl, next to this file.
 #
 # Vocabularies:
 #   FOAF for persons      http://xmlns.com/foaf/0.1/
