@@ -1,0 +1,6 @@
+{
+  "files.associations": {
+    "*.rq": "sparql",
+    "*.ru": "sparql"
+  }
+}
