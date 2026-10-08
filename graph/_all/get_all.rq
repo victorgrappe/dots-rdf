@@ -1,0 +1,12 @@
+# Every triple in the dataset: the default graph, then each named graph.
+# ?g is empty for the default graph.
+#
+# Works on any dataset: send it to /dots/sparql or /persons/sparql.
+
+SELECT ?g ?s ?p ?o
+WHERE {
+  { ?s ?p ?o }
+  UNION
+  { GRAPH ?g { ?s ?p ?o } }
+}
+ORDER BY ?g ?s ?p ?o

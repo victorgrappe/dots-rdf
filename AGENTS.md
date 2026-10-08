@@ -8,6 +8,7 @@ One folder per topic. Each one holds its data, its SPARQL files and its page:
 - `graph/map/`: countries (inserted into `/dots`) and the map page.
 - `graph/person/`: persons and their SHACL shapes, served as `/persons`.
 - `graph/_tmp/`: scratch queries, against `/dots`.
+- `graph/_all/`: queries that work on any dataset.
 
 Fuseki sees the folder as `/data/graph` (see `docker-compose.yml` and
 `jena/config.ttl`). Moving or renaming a `.ttl` file means updating
@@ -21,8 +22,9 @@ Fuseki sees the folder as `/data/graph` (see `docker-compose.yml` and
   Send to `/<dataset>/update` as `update@file`.
 
 Every `.rq` and `.ru` file so far targets `/dots`, including those in
-`graph/map/`. Keep the extensions accurate: scripts loop over
-`graph/*/*.rq` to run every query, and must never run an update by accident.
+`graph/map/`. Those in `graph/_all/` also work on `/persons`. Keep the
+extensions accurate: scripts loop over `graph/*/*.rq` to run every query, and
+must never run an update by accident.
 
 The datasets are in memory: after a server restart, re-run
 `graph/map/insert-countries.ru` before the country queries return anything.

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>persons, minimal</title>
+<!--
+  The smallest SHACL demo: shapes and data are inline, no server needed.
+  shacl-form builds the form from the shapes and validates as you type.
+  Open the file directly: `open graph/person/index_2.html`.
+-->
+<script src="https://cdn.jsdelivr.net/npm/@ulb-darmstadt/shacl-form@3.7.3/dist/bundle.js" type="module"></script>
+</head>
+<body>
+
+<!-- Alice is 212: the Age field shows up invalid. -->
+<shacl-form
+  data-values-subject="http://example.org/alice"
+  data-shapes='
+    PREFIX sh:   <http://www.w3.org/ns/shacl#>
+    PREFIX xsd:  <http://www.w3.org/2001/XMLSchema#>
+    PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+
+    <http://example.org/PersonShape> a sh:NodeShape ;
+      sh:targetClass foaf:Person ;
+      sh:property [ sh:path foaf:name ;  sh:name "Name"  ; sh:datatype xsd:string  ; sh:minCount 1 ; sh:maxCount 1 ] ;
+      sh:property [ sh:path foaf:age ;   sh:name "Age"   ; sh:datatype xsd:integer ; sh:maxInclusive 150 ] ;
+      sh:property [ sh:path foaf:knows ; sh:name "Knows" ; sh:class foaf:Person ] .
+  '
+  data-values='
+    PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+
+    <http://example.org/alice> a foaf:Person ; foaf:name "Alice" ; foaf:age 212 ;
+      foaf:knows <http://example.org/bob> .
+    <http://example.org/bob>   a foaf:Person ; foaf:name "Bob" .
+  '
+></shacl-form>
+
+<p id="valid"></p>
+<pre id="turtle"></pre>
+
+<script>
+  // On every edit: say whether the data conforms, and show the RDF it produces.
+  const form = document.querySelector('shacl-form')
+  form.addEventListener('change', event => {
+    document.getElementById('valid').textContent = event.detail?.valid ? '✅ valid' : '❌ not valid'
+    document.getElementById('turtle').textContent = form.serialize()
+  })
+</script>
+</body>
+</html>
