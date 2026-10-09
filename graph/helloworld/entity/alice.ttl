@@ -1,0 +1,6 @@
+PREFIX hw:   <urn:peano:helloworld:>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+hw:alice a hw:Person ;
+    rdfs:label "Alice" ;
+    hw:knows hw:bob .

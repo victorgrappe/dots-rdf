@@ -1,8 +1,8 @@
 services:
   fuseki:
     build: ./jena
-    image: dots-fuseki
-    container_name: dots-fuseki
+    image: peano-fuseki
+    container_name: peano-fuseki
     ports:
       # Bound to localhost only: jena/shiro.ini leaves the admin API open.
       - "127.0.0.1:3030:3030"
